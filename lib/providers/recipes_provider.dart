@@ -6,9 +6,10 @@ import 'package:http/http.dart' as http;
 
 /* La librería Provider es una herramienta poderosa en Flutter para manejar y compartir estados entre widgets, haciéndolos más sencillos y reutilizables. 
  estructurar llamadas de API de manera eficiente. */
-class RecipesProvider extends ChangeNotifier{
+class RecipesProvider extends ChangeNotifier {
   bool isLoading = false;
   List<Recipe> recipes = [];
+  List<Recipe> favoritesRecipes = [];
 
   /* Consumo de servicios http Future es el Async, estoy consumiendo un servicio con Mockoon*/
   Future<void> fetchRecipes() async {
@@ -22,9 +23,10 @@ class RecipesProvider extends ChangeNotifier{
       final response = await http.get(url);
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        recipes = List<Recipe>.from(data['recipes']
-        .map((recipe) => Recipe.fromJSON(recipe)));
-      }else{
+        recipes = List<Recipe>.from(
+          data['recipes'].map((recipe) => Recipe.fromJSON(recipe)),
+        );
+      } else {
         //print('Error ${response.statusCode}');
         recipes = [];
       }
@@ -33,6 +35,31 @@ class RecipesProvider extends ChangeNotifier{
       recipes = [];
     } finally {
       isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> toggleFavoriteStatus(Recipe recipe) async {
+    final isFavorite = favoritesRecipes.contains(recipe);
+    try {
+      final url = Uri.parse('http://10.0.2.2:3001/favorites');
+      final response = isFavorite
+          ? await http.delete(url, body: json.encode({"id": recipe.id}))
+          : await http.post(url, body: json.encode(recipe.toJson()));
+
+      if (response.statusCode == 200) {
+        if (isFavorite) {
+          favoritesRecipes.add(recipe);
+        } else {
+          favoritesRecipes.remove(recipe);
+        }
+        notifyListeners();
+      } else {
+        throw Exception('Failed to update favorite recipes');
+      }
+    } catch (e) {
+      //print('Error updating $e');
+    } finally {
       notifyListeners();
     }
   }
