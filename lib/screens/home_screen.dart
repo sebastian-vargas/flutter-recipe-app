@@ -1,14 +1,38 @@
 import 'package:flutter/material.dart';
+import 'package:recipe_book/providers/recipes_provider.dart';
 import 'package:recipe_book/screens/recipe_detail.dart';
+import 'package:provider/provider.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
+    // Usamos WidgetsBinding para ejecutar la llamada después de la construcción inicial del widget
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final recipesProvider = Provider.of<RecipesProvider>(
+        context,
+        listen: false,
+      );
+      recipesProvider.fetchRecipes();
+    });
+
     return Scaffold(
-      body: Column(
-        children: <Widget>[_recipesCard(context), _recipesCard(context)],
+      body: Consumer<RecipesProvider>(
+        builder: (context, provider, child) {
+          if (provider.isLoading) {
+            return const Center(child: CircularProgressIndicator());
+          } else if (provider.recipes.isEmpty) {
+            return const Center(child: Text('No recipes found'));
+          } else {
+            return ListView.builder(
+              itemCount: provider.recipes.length,
+              itemBuilder: (context, index) {
+                return _recipesCard(context, provider.recipes[index]);
+              },
+            );
+          }
+        },
       ),
       floatingActionButton: FloatingActionButton(
         backgroundColor: Colors.blue,
@@ -33,10 +57,15 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  Widget _recipesCard(BuildContext context) {
+  Widget _recipesCard(BuildContext context, dynamic recipe) {
     return GestureDetector(
-      onTap: (){
-        Navigator.push(context, MaterialPageRoute(builder: (context) => RecipeDetail(recipeName:'Vegetables')));
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => RecipeDetail(recipeName: recipe.name),
+          ),
+        );
       },
       child: Padding(
         padding: const EdgeInsets.all(8.0),
@@ -46,13 +75,24 @@ class HomeScreen extends StatelessWidget {
           child: Card(
             child: Row(
               children: <Widget>[
-                Container(
+                SizedBox(
                   height: 150,
                   width: 150,
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(10),
                     child: Image.network(
-                      'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?q=80&w=2070&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
+                      recipe.imageLink,
+                      errorBuilder: (context, error, stackTrace) {
+                        return Container(
+                          color:
+                              Colors.grey[200], // Background for the fallback
+                          child: Icon(
+                            Icons.broken_image,
+                            color: Colors.grey[400],
+                            size: 50,
+                          ), // Placeholder icon
+                        );
+                      },
                       fit: BoxFit.cover,
                     ),
                   ),
@@ -60,11 +100,16 @@ class HomeScreen extends StatelessWidget {
                 const SizedBox(width: 26),
                 Column(
                   mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.start, // alinear textos
+                  crossAxisAlignment:
+                      CrossAxisAlignment.start, // alinear textos
                   children: <Widget>[
-                    const Text('Vegetables'),
-                    const Text('Johan V'),
-                    Container(height: 2, width: 75, color: Colors.orange),
+                    Text(recipe.name, style: TextStyle(fontSize: 16)),
+                    Text(recipe.author, style: TextStyle(fontSize: 16)),
+                    SizedBox(
+                      height: 2,
+                      width: 75,
+                      child: ColoredBox(color: Colors.orange),
+                    ),
                   ],
                 ),
               ],
@@ -81,17 +126,17 @@ class RecipeForm extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final _formKey = GlobalKey<FormState>();
+    final formKey = GlobalKey<FormState>();
 
-    final TextEditingController _recipeName = TextEditingController();
-    final TextEditingController _recipeAuthor = TextEditingController();
-    final TextEditingController _recipeIMG = TextEditingController();
-    final TextEditingController _recipeDescription = TextEditingController();
+    final TextEditingController recipeName = TextEditingController();
+    final TextEditingController recipeAuthor = TextEditingController();
+    final TextEditingController recipeIMG = TextEditingController();
+    final TextEditingController recipeDescription = TextEditingController();
 
     return Padding(
       padding: EdgeInsets.all(8),
       child: Form(
-        key: _formKey,
+        key: formKey,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -101,7 +146,7 @@ class RecipeForm extends StatelessWidget {
             ),
             SizedBox(height: 16),
             _buildTextField(
-              controller: _recipeName,
+              controller: recipeName,
               label: 'Recipe Name',
               validator: (value) {
                 if (value == null || value.isEmpty) {
@@ -112,7 +157,7 @@ class RecipeForm extends StatelessWidget {
             ),
             SizedBox(height: 16),
             _buildTextField(
-              controller: _recipeAuthor,
+              controller: recipeAuthor,
               label: 'Author',
               validator: (value) {
                 if (value == null || value.isEmpty) {
@@ -123,7 +168,7 @@ class RecipeForm extends StatelessWidget {
             ),
             SizedBox(height: 16),
             _buildTextField(
-              controller: _recipeIMG,
+              controller: recipeIMG,
               label: 'Image URL',
               validator: (value) {
                 if (value == null || value.isEmpty) {
@@ -135,7 +180,7 @@ class RecipeForm extends StatelessWidget {
             SizedBox(height: 16),
             _buildTextField(
               maxLines: 4,
-              controller: _recipeDescription,
+              controller: recipeDescription,
               label: 'Recipe',
               validator: (value) {
                 if (value == null || value.isEmpty) {
@@ -148,17 +193,24 @@ class RecipeForm extends StatelessWidget {
             Center(
               child: ElevatedButton(
                 onPressed: () {
-                  if (_formKey.currentState!.validate()) {
+                  if (formKey.currentState!.validate()) {
                     Navigator.pop(context);
                   }
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.blue,
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadiusGeometry.circular(10)
-                  )
+                    borderRadius: BorderRadiusGeometry.circular(10),
+                  ),
                 ),
-                child: Text("Save Recipe", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),),
+                child: Text(
+                  "Save Recipe",
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
               ),
             ),
           ],
@@ -171,9 +223,10 @@ class RecipeForm extends StatelessWidget {
     int maxLines = 1,
     required TextEditingController controller,
     required String label,
-    required String? Function(String?) validator
+    required String? Function(String?) validator,
   }) {
     return TextFormField(
+      controller: controller,
       decoration: InputDecoration(
         labelText: label,
         labelStyle: TextStyle(fontFamily: 'QuickSand', color: Colors.blue),
@@ -183,7 +236,7 @@ class RecipeForm extends StatelessWidget {
           borderRadius: BorderRadius.circular(10),
         ),
       ),
-      validator : validator,
+      validator: validator,
       maxLines: maxLines,
     );
   }
