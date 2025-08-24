@@ -40,18 +40,18 @@ class RecipesProvider extends ChangeNotifier {
   }
 
   Future<void> toggleFavoriteStatus(Recipe recipe) async {
-    final isFavorite = favoritesRecipes.contains(recipe);
+    final alreadyFavorite = favoritesRecipes.contains(recipe);
     try {
       final url = Uri.parse('http://10.0.2.2:3001/favorites');
-      final response = isFavorite
+      final response = alreadyFavorite
           ? await http.delete(url, body: json.encode({"id": recipe.id}))
           : await http.post(url, body: json.encode(recipe.toJson()));
 
       if (response.statusCode == 200) {
-        if (isFavorite) {
-          favoritesRecipes.add(recipe);
-        } else {
+        if (alreadyFavorite) {
           favoritesRecipes.remove(recipe);
+        } else {
+          favoritesRecipes.add(recipe);
         }
         notifyListeners();
       } else {
